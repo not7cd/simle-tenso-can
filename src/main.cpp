@@ -85,8 +85,8 @@ void setup()
   Serial.println("Configure ESP32 CAN");
   ACAN_ESP32_Settings settings(DESIRED_BIT_RATE);
   settings.mRequestedCANMode = ACAN_ESP32_Settings::LoopBackMode;
-  settings.mRxPin = CTX_PIN;
-  settings.mTxPin = CRX_PIN;
+  settings.mRxPin = CRX_PIN;
+  settings.mTxPin = CTX_PIN;
   const uint32_t errorCode = ACAN_ESP32::can.begin(settings);
 
   if (errorCode == 0)
