@@ -15,6 +15,8 @@
 #include <ArduinoUAVCAN.h>
 #include <ACAN_ESP32.h>
 
+#include "HX711.h"
+
 /**************************************************************************************
  * NAMESPACE
  **************************************************************************************/
@@ -30,6 +32,11 @@ static const int LED_BUILTIN = 2;
 
 static const gpio_num_t CTX_PIN = GPIO_NUM_4;
 static const gpio_num_t CRX_PIN = GPIO_NUM_5;
+
+static const gpio_num_t LOADCELL_DOUT_PIN = GPIO_NUM_17;
+static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
+
+const float calibration_factor = -68100;
 
 /**************************************************************************************
  * FUNCTION DECLARATION
@@ -59,6 +66,8 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 ArduinoUAVCAN uc(13, transmitCanFrame);
 
 Heartbeat_1_0 hb;
+
+HX711 scale;
 
 static uint32_t gBlinkLedDate = 0;
 static uint32_t gReceivedFrameCount = 0;
@@ -99,6 +108,11 @@ void setup()
     Serial.println(errorCode, HEX);
   }
 
+  /* Configure scale */
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(calibration_factor);
+  scale.tare();
+
   /* Configure initial heartbeat */
   hb.data.uptime = 0;
   hb = Heartbeat_1_0::Health::NOMINAL;
@@ -119,6 +133,11 @@ void loop()
   {
     uc.publish(hb);
     prev = now;
+
+    Serial.print("one reading:\t");
+    Serial.print(scale.get_units(), 1);
+    Serial.print("\t| average:\t");
+    Serial.println(scale.get_units(10), 1);
   }
 
   /* Transmit all enqeued CAN frames */
