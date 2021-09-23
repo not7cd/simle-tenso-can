@@ -241,12 +241,29 @@ bool transmitCanFrame(CanardFrame const &frame)
   }
   
   frame2.len = static_cast<uint8_t const>(frame.payload_size);
+
+  Serial.print("TX ");
+  Serial.println(frame2.id);
   const bool ok = ACAN_ESP32::can.tryToSend(frame2);
   if (ok)
   {
     gSentFrameCount += 1;
   }
   return ok;
+}
+
+void onReceiveCanFrame(CANMessage const &frame)
+{
+  CanardFrame const f
+    {
+      NULL,                        /* timestamp_usec  */
+      frame.id & MCP2515::CAN_ADR_BITMASK,       /* extended_can_id limited to 29 bit */
+      static_cast<uint8_t const>(frame.len),     /* payload_size    */
+      reinterpret_cast<const void *>(frame.data) /* payload         */
+    };
+  Serial.print("RX ");
+  Serial.println(frame.id);
+  uc.onCanFrameReceived(f);
 }
 
 void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc)
