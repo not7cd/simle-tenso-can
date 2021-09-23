@@ -13,6 +13,7 @@
 #include <core_version.h> // For ARDUINO_ESP32_RELEASE
 
 #include <ArduinoUAVCAN.h>
+#include <ArduinoMCP2515.h>
 #include <ACAN_ESP32.h>
 
 #include "HX711.h"
@@ -59,6 +60,8 @@ static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
 
 const float calibration_factor = -68100;
 
+static CanardPortID const LOADCELL_PORT_ID   = 1337U;
+
 /**************************************************************************************
  * FUNCTION DECLARATION
  **************************************************************************************/
@@ -90,6 +93,7 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
 Heartbeat_1_0<> hb;
+uavcan::primitive::scalar::Real32_1_0<LOADCELL_PORT_ID> scale_measurment;
 
 HX711 scale;
 
@@ -117,7 +121,7 @@ void setup()
   //--- Configure ESP32 CAN
   Serial.println("Configure ESP32 CAN");
   ACAN_ESP32_Settings settings(DESIRED_BIT_RATE);
-  settings.mRequestedCANMode = ACAN_ESP32_Settings::LoopBackMode;
+  // settings.mRequestedCANMode = ACAN_ESP32_Settings::LoopBackMode;
   settings.mRxPin = CRX_PIN;
   settings.mTxPin = CTX_PIN;
   const uint32_t errorCode = ACAN_ESP32::can.begin(settings);
@@ -157,7 +161,9 @@ void loop()
   unsigned long const now = millis();
   if (now - prev > 1000)
   {
+    scale_measurment.data.value = scale.get_units(10);
     uc.publish(hb);
+    uc.publish(scale_measurment);
     prev = now;
 
     Serial.print("one reading:\t");
@@ -188,11 +194,6 @@ void loop()
     Serial.print(CAN_RX_ECR);
     Serial.print(" TXERR ");
     Serial.println(CAN_TX_ECR);
-    const bool ok = ACAN_ESP32::can.tryToSend(frame);
-    if (ok)
-    {
-      gSentFrameCount += 1;
-    }
   }
   while (ACAN_ESP32::can.receive(frame))
   {
