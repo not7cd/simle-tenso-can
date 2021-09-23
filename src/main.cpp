@@ -27,6 +27,27 @@ using namespace uavcan::node;
  * CONSTANTS
  **************************************************************************************/
 
+static const CanardNodeID UC_ID = 16;
+static const uint8_t UC_NAME[50] = "pl.simle.r5.tensocan";
+static const uavcan_node_GetInfo_Response_1_0 GET_INFO_DATA = {
+    /// uavcan.node.Version.1.0 protocol_version
+    {1, 0},
+    /// uavcan.node.Version.1.0 hardware_version
+    {1, 0},
+    /// uavcan.node.Version.1.0 software_version
+    {0, 1},
+    /// saturated uint64 software_vcs_revision_id
+    NULL,
+    /// saturated uint8[16] unique_id
+    {0x86, 0xcc, 0xed, 0x61, 0x97, 0x1f, 0x4a, 0xf9, 
+     0x9d, 0x19, 0x51, 0xc3, 0x9a, 0xb9, 0xa8, 0xd1},
+    /// saturated uint8[<=50] name
+    {
+        "pl.simle.r5.tensocan",
+        strlen("pl.simle.r5.tensocan")
+    },
+};
+
 static const uint32_t DESIRED_BIT_RATE = 1000UL * 1000UL; // 1 Mb/s
 static const int LED_BUILTIN = 2;
 
@@ -47,6 +68,9 @@ const float calibration_factor = -68100;
 // uint8_t spi_transfer(uint8_t const);
 // void onExternalEvent();
 bool transmitCanFrame(CanardFrame const &);
+void onReceiveCanFrame(CANMessage const &);
+void onGetInfo_1_0_Request_Received(CanardTransfer const &, ArduinoUAVCAN &);
+
 
 void print_ESP_chip_info();
 void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
@@ -63,7 +87,7 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 //                        nullptr,
 //                        nullptr);
 
-ArduinoUAVCAN uc(13, transmitCanFrame);
+ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
 Heartbeat_1_0 hb;
 
@@ -118,6 +142,8 @@ void setup()
   hb = Heartbeat_1_0::Health::NOMINAL;
   hb = Heartbeat_1_0::Mode::INITIALIZATION;
   hb.data.vendor_specific_status_code = 0;
+
+  uc.subscribe<GetInfo_1_0::Request>(onGetInfo_1_0_Request_Received);
 }
 
 void loop()
@@ -221,6 +247,16 @@ bool transmitCanFrame(CanardFrame const &frame)
   }
   return ok;
 }
+
+void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc)
+{
+  GetInfo_1_0::Request req = GetInfo_1_0::Request::deserialize(transfer);
+  GetInfo_1_0::Response rsp = GetInfo_1_0::Response();
+  rsp.data = GET_INFO_DATA;
+  Serial.println("onGetInfo_1_0_Request_Received");
+  uc.respond(rsp, transfer.remote_node_id, transfer.transfer_id);
+}
+
 
 void print_ESP_chip_info()
 {
