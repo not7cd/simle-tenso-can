@@ -89,7 +89,7 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 
 ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
-Heartbeat_1_0 hb;
+Heartbeat_1_0<> hb;
 
 HX711 scale;
 
@@ -139,18 +139,18 @@ void setup()
 
   /* Configure initial heartbeat */
   hb.data.uptime = 0;
-  hb = Heartbeat_1_0::Health::NOMINAL;
-  hb = Heartbeat_1_0::Mode::INITIALIZATION;
+  hb = Heartbeat_1_0<>::Health::NOMINAL;
+  hb = Heartbeat_1_0<>::Mode::INITIALIZATION;
   hb.data.vendor_specific_status_code = 0;
 
-  uc.subscribe<GetInfo_1_0::Request>(onGetInfo_1_0_Request_Received);
+  uc.subscribe<GetInfo_1_0::Request<>>(onGetInfo_1_0_Request_Received);
 }
 
 void loop()
 {
   /* Update the heartbeat object */
   hb.data.uptime = millis() / 1000;
-  hb = Heartbeat_1_0::Mode::OPERATIONAL;
+  hb = Heartbeat_1_0<>::Mode::OPERATIONAL;
 
   /* Publish the heartbeat once/second */
   static unsigned long prev = 0;
@@ -196,6 +196,7 @@ void loop()
   }
   while (ACAN_ESP32::can.receive(frame))
   {
+    onReceiveCanFrame(frame);
     gReceivedFrameCount += 1;
   }
 }
@@ -250,8 +251,8 @@ bool transmitCanFrame(CanardFrame const &frame)
 
 void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc)
 {
-  GetInfo_1_0::Request req = GetInfo_1_0::Request::deserialize(transfer);
-  GetInfo_1_0::Response rsp = GetInfo_1_0::Response();
+  GetInfo_1_0::Request<> req = GetInfo_1_0::Request<>::deserialize(transfer);
+  GetInfo_1_0::Response<> rsp = GetInfo_1_0::Response<>();
   rsp.data = GET_INFO_DATA;
   Serial.println("onGetInfo_1_0_Request_Received");
   uc.respond(rsp, transfer.remote_node_id, transfer.transfer_id);
