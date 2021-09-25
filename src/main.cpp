@@ -22,6 +22,8 @@
 #include "HX711.h"
 #include <LiquidCrystal_PCF8574.h>
 
+#include "display.h"
+
 /**************************************************************************************
  * NAMESPACE
  **************************************************************************************/
@@ -64,6 +66,7 @@ static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
 
 const float calibration_factor = -68100;
 
+static CanardPortID const TEMP_PORT_ID   = 2137U;
 static CanardPortID const LOADCELL_PORT_ID   = 1337U;
 
 #define COLUMS 20
@@ -138,6 +141,7 @@ void setup()
   //--- Configure ESP32 CAN
   Serial.println("Configure ESP32 CAN");
   ACAN_ESP32_Settings settings(DESIRED_BIT_RATE);
+  // settings.mRequestedCANMode = ACAN_ESP32_Settings::LoopBackMode;
   settings.mRxPin = CRX_PIN;
   settings.mTxPin = CTX_PIN;
   const uint32_t errorCode = ACAN_ESP32::can.begin(settings);
@@ -175,27 +179,17 @@ void loop()
   /* Publish the heartbeat once/second */
   static unsigned long prev = 0;
   unsigned long const now = millis();
-  if (now - prev > 1000)
+  if (now - prev > 500)
   {
     scale_measurment.data.value = scale.get_units(10);
     uc.publish(hb);
     uc.publish(scale_measurment);
     prev = now;
 
-    Serial.print("one reading:\t");
-    Serial.print(scale.get_units(), 1);
-    Serial.print("\t| average:\t");
-    Serial.println(scale.get_units(10), 1);
-  }
+    lcd.clear();
+    printWeight(lcd, scale_measurment.data.value);
+    print_can_stats(lcd);
 
-  /* Transmit all enqeued CAN frames */
-  while (uc.transmitCanFrame())
-  {
-  }
-
-  CANMessage frame;
-  if (gBlinkLedDate < millis())
-  {
     gBlinkLedDate += 500;
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     Serial.print("Sent: ");
@@ -211,22 +205,19 @@ void loop()
     Serial.print(" TXERR ");
     Serial.println(CAN_TX_ECR);
   }
+
+  CANMessage frame;
+  /* Transmit all enqeued CAN frames */
+  while (uc.transmitCanFrame())
+  {
+  }
   while (ACAN_ESP32::can.receive(frame))
   {
     onReceiveCanFrame(frame);
     gReceivedFrameCount += 1;
   }
 
-  for (uint8_t i = 0; i < 256; i++)
-  {
-    if ((i != 0) && (i % PAGE == 0))
-    {
-      delay(10000);
-      lcd.clear();
-    }
 
-    lcd.write(i);
-  }
 }
 
 /**************************************************************************************
