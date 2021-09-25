@@ -9,7 +9,10 @@
  * INCLUDES
  **************************************************************************************/
 
+#include "Arduino.h"
 #include <SPI.h>
+#include <Wire.h>              //for ESP8266 use bug free i2c driver https://github.com/enjoyneering/ESP8266-I2C-Driver
+
 #include <core_version.h> // For ARDUINO_ESP32_RELEASE
 
 #include <ArduinoUAVCAN.h>
@@ -17,6 +20,7 @@
 #include <ACAN_ESP32.h>
 
 #include "HX711.h"
+#include <LiquidCrystal_PCF8574.h>
 
 /**************************************************************************************
  * NAMESPACE
@@ -62,6 +66,11 @@ const float calibration_factor = -68100;
 
 static CanardPortID const LOADCELL_PORT_ID   = 1337U;
 
+#define COLUMS 20
+#define ROWS   4
+
+#define PAGE   ((COLUMS) * (ROWS))
+
 /**************************************************************************************
  * FUNCTION DECLARATION
  **************************************************************************************/
@@ -97,9 +106,13 @@ uavcan::primitive::scalar::Real32_1_0<LOADCELL_PORT_ID> scale_measurment;
 
 HX711 scale;
 
+LiquidCrystal_PCF8574 lcd(0x27); // set the LCD address to 0x27 for a 16 chars and 2 line display
+
 static uint32_t gBlinkLedDate = 0;
 static uint32_t gReceivedFrameCount = 0;
 static uint32_t gSentFrameCount = 0;
+
+int show = -1;
 
 /**************************************************************************************
  * SETUP/LOOP
@@ -107,6 +120,7 @@ static uint32_t gSentFrameCount = 0;
 
 void setup()
 {
+  int error;
   //--- Switch on builtin led
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -115,6 +129,21 @@ void setup()
   while (!Serial)
   {
   }
+
+  Wire.begin();
+  Wire.beginTransmission(0x27);
+  error = Wire.endTransmission();
+  Serial.print("Error: ");
+  Serial.print(error);
+
+  if (error == 0) {
+    Serial.println(": LCD found.");
+    show = 0;
+    lcd.begin(16, 2); // initialize the lcd
+
+  } else {
+    Serial.println(": LCD not found.");
+  } // if
 
   print_ESP_chip_info();
 
@@ -200,6 +229,17 @@ void loop()
     onReceiveCanFrame(frame);
     gReceivedFrameCount += 1;
   }
+
+  for (uint8_t i = 0; i < 256; i++)
+  {
+    if ((i != 0) && (i % PAGE == 0))
+    {
+      delay(10000);
+      lcd.clear();
+    }
+
+    lcd.write(i);
+  }
 }
 
 /**************************************************************************************
@@ -257,7 +297,7 @@ void onReceiveCanFrame(CANMessage const &frame)
 {
   CanardFrame const f
     {
-      NULL,                        /* timestamp_usec  */
+      1,                        /* timestamp_usec  */
       frame.id & MCP2515::CAN_ADR_BITMASK,       /* extended_can_id limited to 29 bit */
       static_cast<uint8_t const>(frame.len),     /* payload_size    */
       reinterpret_cast<const void *>(frame.data) /* payload         */
@@ -269,7 +309,6 @@ void onReceiveCanFrame(CANMessage const &frame)
 
 void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc)
 {
-  GetInfo_1_0::Request<> req = GetInfo_1_0::Request<>::deserialize(transfer);
   GetInfo_1_0::Response<> rsp = GetInfo_1_0::Response<>();
   rsp.data = GET_INFO_DATA;
   Serial.println("onGetInfo_1_0_Request_Received");
