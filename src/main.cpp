@@ -75,10 +75,6 @@ static CanardPortID const LOADCELL_PORT_ID   = 1337U;
  * FUNCTION DECLARATION
  **************************************************************************************/
 
-// void spi_select();
-// void spi_deselect();
-// uint8_t spi_transfer(uint8_t const);
-// void onExternalEvent();
 bool transmitCanFrame(CanardFrame const &);
 void onReceiveCanFrame(CANMessage const &);
 void onGetInfo_1_0_Request_Received(CanardTransfer const &, ArduinoUAVCAN &);
@@ -90,14 +86,6 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 /**************************************************************************************
  * GLOBAL VARIABLES
  **************************************************************************************/
-
-// TODO: delete
-// ArduinoMCP2515 mcp2515(spi_select,
-//                        spi_deselect,
-//                        spi_transfer,
-//                        micros,
-//                        nullptr,
-//                        nullptr);
 
 ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
@@ -150,7 +138,6 @@ void setup()
   //--- Configure ESP32 CAN
   Serial.println("Configure ESP32 CAN");
   ACAN_ESP32_Settings settings(DESIRED_BIT_RATE);
-  // settings.mRequestedCANMode = ACAN_ESP32_Settings::LoopBackMode;
   settings.mRxPin = CRX_PIN;
   settings.mTxPin = CTX_PIN;
   const uint32_t errorCode = ACAN_ESP32::can.begin(settings);
@@ -246,26 +233,6 @@ void loop()
  * FUNCTION DEFINITION
  **************************************************************************************/
 
-void spi_select()
-{
-  // digitalWrite(MKRCAN_MCP2515_CS_PIN, LOW);
-}
-
-void spi_deselect()
-{
-  // digitalWrite(MKRCAN_MCP2515_CS_PIN, HIGH);
-}
-
-uint8_t spi_transfer(uint8_t const data)
-{
-  return SPI.transfer(data);
-}
-
-void onExternalEvent()
-{
-  // TODO: change for acan_esp32
-  // mcp2515.onExternalEventHandler();
-}
 
 bool transmitCanFrame(CanardFrame const &frame)
 {
