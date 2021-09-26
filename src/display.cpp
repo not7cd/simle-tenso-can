@@ -7,10 +7,17 @@ void printWeight (LiquidCrystal_PCF8574 &lcd, float value) {
     lcd.print(s);
 }
 
-void printTemp (LiquidCrystal_PCF8574 &lcd, float value) {
+void print_temp (LiquidCrystal_PCF8574 &lcd, float value, bool err) {
     char s[16];
-    sprintf(s, "%+05.1f C", value);
-    lcd.setCursor(0, 0);
+    if (err)
+    {
+        sprintf(s, "T#####");
+    }
+    else {
+        sprintf(s, "T%+05.1f", value);
+    }
+    
+    lcd.setCursor(10, 1);
     lcd.print(s);
 }
 

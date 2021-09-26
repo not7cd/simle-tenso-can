@@ -29,6 +29,7 @@
  **************************************************************************************/
 
 using namespace uavcan::node;
+using namespace uavcan::primitive::scalar;
 
 /**************************************************************************************
  * CONSTANTS
@@ -68,6 +69,7 @@ const float calibration_factor = -68100;
 
 static CanardPortID const TEMP_PORT_ID   = 2137U;
 static CanardPortID const LOADCELL_PORT_ID   = 1337U;
+static CanardPortID const TEMP_PORT_ID   = 2137U;
 
 #define COLUMS 20
 #define ROWS   4
@@ -81,7 +83,7 @@ static CanardPortID const LOADCELL_PORT_ID   = 1337U;
 bool transmitCanFrame(CanardFrame const &);
 void onReceiveCanFrame(CANMessage const &);
 void onGetInfo_1_0_Request_Received(CanardTransfer const &, ArduinoUAVCAN &);
-
+void onTemperature_1_0_Received(CanardTransfer const &, ArduinoUAVCAN &);
 
 void print_ESP_chip_info();
 void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
@@ -93,7 +95,9 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
 Heartbeat_1_0<> hb;
-uavcan::primitive::scalar::Real32_1_0<LOADCELL_PORT_ID> scale_measurment;
+
+// external
+Real32_1_0<TEMP_PORT_ID> temperature_measurment;
 
 HX711 scale;
 
@@ -102,6 +106,7 @@ LiquidCrystal_PCF8574 lcd(0x27); // set the LCD address to 0x27 for a 16 chars a
 static uint32_t gBlinkLedDate = 0;
 static uint32_t gReceivedFrameCount = 0;
 static uint32_t gSentFrameCount = 0;
+static uint32_t temperature_last_received = 0;
 
 int show = -1;
 
@@ -168,6 +173,7 @@ void setup()
   hb.data.vendor_specific_status_code = 0;
 
   uc.subscribe<GetInfo_1_0::Request<>>(onGetInfo_1_0_Request_Received);
+  uc.subscribe<Real32_1_0<TEMP_PORT_ID>>(onTemperature_1_0_Received);
 }
 
 void loop()
@@ -189,6 +195,8 @@ void loop()
     lcd.clear();
     printWeight(lcd, scale_measurment.data.value);
     print_can_stats(lcd);
+    print_temp(lcd, temperature_measurment.data.value, 
+      now - temperature_last_received > 3000);
 
     gBlinkLedDate += 500;
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
@@ -271,6 +279,12 @@ void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVC
   rsp.data = GET_INFO_DATA;
   Serial.println("onGetInfo_1_0_Request_Received");
   uc.respond(rsp, transfer.remote_node_id, transfer.transfer_id);
+}
+
+void onTemperature_1_0_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc) {
+  Real32_1_0<TEMP_PORT_ID> const d = Real32_1_0<TEMP_PORT_ID>::deserialize(transfer);
+  temperature_measurment = d;
+  temperature_last_received = millis();
 }
 
 
