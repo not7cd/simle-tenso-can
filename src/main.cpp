@@ -19,6 +19,10 @@
 #include <ArduinoMCP2515.h>
 #include <ACAN_ESP32.h>
 
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
+
 #include "HX711.h"
 #include <LiquidCrystal_PCF8574.h>
 
@@ -65,16 +69,22 @@ static const gpio_num_t CRX_PIN = GPIO_NUM_5;
 static const gpio_num_t LOADCELL_DOUT_PIN = GPIO_NUM_17;
 static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
 
+static const gpio_num_t DHT_PIN = GPIO_NUM_15;
+
 const float calibration_factor = -68100;
 
-static CanardPortID const TEMP_PORT_ID   = 2137U;
 static CanardPortID const LOADCELL_PORT_ID   = 1337U;
+static CanardPortID const DHT_T_PORT_ID   = 1338U;
+static CanardPortID const DHT_H_PORT_ID   = 1339U;
+
 static CanardPortID const TEMP_PORT_ID   = 2137U;
 
 #define COLUMS 20
 #define ROWS   4
 
 #define PAGE   ((COLUMS) * (ROWS))
+
+#define DHTTYPE    DHT11
 
 /**************************************************************************************
  * FUNCTION DECLARATION
@@ -84,6 +94,8 @@ bool transmitCanFrame(CanardFrame const &);
 void onReceiveCanFrame(CANMessage const &);
 void onGetInfo_1_0_Request_Received(CanardTransfer const &, ArduinoUAVCAN &);
 void onTemperature_1_0_Received(CanardTransfer const &, ArduinoUAVCAN &);
+void get_scale();
+void get_dht();
 
 void print_ESP_chip_info();
 void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
@@ -95,11 +107,15 @@ void print_ESP_CAN_info(ACAN_ESP32_Settings &settings);
 ArduinoUAVCAN uc(UC_ID, transmitCanFrame);
 
 Heartbeat_1_0<> hb;
+Real32_1_0<LOADCELL_PORT_ID> scale_measurment;
+Real32_1_0<DHT_T_PORT_ID> dht_t_measurment;
+Real32_1_0<DHT_H_PORT_ID> dht_h_measurment;
 
 // external
 Real32_1_0<TEMP_PORT_ID> temperature_measurment;
 
 HX711 scale;
+DHT_Unified dht(DHT_PIN, DHTTYPE);
 
 LiquidCrystal_PCF8574 lcd(0x27); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
@@ -107,6 +123,8 @@ static uint32_t gBlinkLedDate = 0;
 static uint32_t gReceivedFrameCount = 0;
 static uint32_t gSentFrameCount = 0;
 static uint32_t temperature_last_received = 0;
+
+static bool dht_err = false;
 
 int show = -1;
 
@@ -140,6 +158,8 @@ void setup()
   } else {
     Serial.println(": LCD not found.");
   } // if
+
+  dht.begin();
 
   print_ESP_chip_info();
 
@@ -185,20 +205,21 @@ void loop()
   /* Publish the heartbeat once/second */
   static unsigned long prev = 0;
   unsigned long const now = millis();
-  if (now - prev > 500)
+  if (now - prev > 1000)
   {
-    scale_measurment.data.value = scale.get_units(10);
+    get_scale();
+    get_dht();
     uc.publish(hb);
     uc.publish(scale_measurment);
     prev = now;
 
     lcd.clear();
-    printWeight(lcd, scale_measurment.data.value);
     print_can_stats(lcd);
+    print_weight(lcd, scale_measurment.data.value);
     print_temp(lcd, temperature_measurment.data.value, 
       now - temperature_last_received > 3000);
+    print_dht(lcd, dht_t_measurment.data.value, dht_h_measurment.data.value, dht_err);
 
-    gBlinkLedDate += 500;
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     Serial.print("Sent: ");
     Serial.print(gSentFrameCount);
@@ -232,6 +253,37 @@ void loop()
  * FUNCTION DEFINITION
  **************************************************************************************/
 
+void get_dht() {
+  sensors_event_t event;
+  dht_err = false;
+  dht.temperature().getEvent(&event);
+  if (isnan(event.temperature)) {
+    Serial.println(F("Error reading temperature!"));
+    dht_err = true;
+  }
+  else {
+    Serial.print(F("Temperature: "));
+    Serial.print(event.temperature);
+    Serial.println(F("°C"));
+    dht_t_measurment.data.value = event.temperature;
+  }
+  // Get humidity event and print its value.
+  dht.humidity().getEvent(&event);
+  if (isnan(event.relative_humidity)) {
+    Serial.println(F("Error reading humidity!"));
+    dht_err = true;
+  }
+  else {
+    Serial.print(F("Humidity: "));
+    Serial.print(event.relative_humidity);
+    Serial.println(F("%"));
+    dht_h_measurment.data.value = event.relative_humidity;
+  }
+}
+
+void get_scale() {
+  scale_measurment.data.value = scale.get_units(10);
+}
 
 bool transmitCanFrame(CanardFrame const &frame)
 {
@@ -249,8 +301,8 @@ bool transmitCanFrame(CanardFrame const &frame)
   
   frame2.len = static_cast<uint8_t const>(frame.payload_size);
 
-  Serial.print("TX ");
-  Serial.println(frame2.id);
+  // Serial.print("TX ");
+  // Serial.println(frame2.id);
   const bool ok = ACAN_ESP32::can.tryToSend(frame2);
   if (ok)
   {

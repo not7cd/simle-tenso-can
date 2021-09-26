@@ -1,6 +1,6 @@
 #include "display.h"
 
-void printWeight (LiquidCrystal_PCF8574 &lcd, float value) {
+void print_weight (LiquidCrystal_PCF8574 &lcd, float value) {
     char s[16];
     sprintf(s, "% 05.1fkg", value);
     lcd.setCursor(0, 0);
@@ -18,6 +18,23 @@ void print_temp (LiquidCrystal_PCF8574 &lcd, float value, bool err) {
     }
     
     lcd.setCursor(10, 1);
+    lcd.print(s);
+}
+
+void print_dht (LiquidCrystal_PCF8574 &lcd, float t, float h, bool err) {
+    char s[6];
+    if (err)
+    {
+        sprintf(s, "DHTERR");
+    } else if (millis() / 2000 % 2)
+    {
+        sprintf(s, "H% 3.0f\% ", h);
+    }
+    else {
+        sprintf(s, "T%+05.1f", t);
+    }
+    
+    lcd.setCursor(10, 0);
     lcd.print(s);
 }
 
