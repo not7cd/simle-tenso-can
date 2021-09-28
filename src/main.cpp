@@ -60,7 +60,7 @@ static const uavcan_node_GetInfo_Response_1_0 GET_INFO_DATA = {
     },
 };
 
-static const uint32_t DESIRED_BIT_RATE = 1000UL * 1000UL; // 1 Mb/s
+static const uint32_t DESIRED_BIT_RATE = 125UL * 1000UL; // 125 kb/s
 static const int LED_BUILTIN = 2;
 
 static const gpio_num_t CTX_PIN = GPIO_NUM_4;
@@ -112,7 +112,7 @@ Real32_1_0<DHT_T_PORT_ID> dht_t_measurment;
 Real32_1_0<DHT_H_PORT_ID> dht_h_measurment;
 
 // external
-Real32_1_0<TEMP_PORT_ID> temperature_measurment;
+Real32_1_0<TEMP_PORT_ID> tempAbove;
 
 HX711 scale;
 DHT_Unified dht(DHT_PIN, DHTTYPE);
@@ -205,7 +205,7 @@ void loop()
   /* Publish the heartbeat once/second */
   static unsigned long prev = 0;
   unsigned long const now = millis();
-  if (now - prev > 1000)
+  if (now - prev >= 1000)
   {
     get_scale();
     get_dht();
@@ -216,7 +216,7 @@ void loop()
     lcd.clear();
     print_can_stats(lcd);
     print_weight(lcd, scale_measurment.data.value);
-    print_temp(lcd, temperature_measurment.data.value, 
+    print_temp(lcd, tempAbove.data.value, 
       now - temperature_last_received > 3000);
     print_dht(lcd, dht_t_measurment.data.value, dht_h_measurment.data.value, dht_err);
 
@@ -335,7 +335,7 @@ void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVC
 
 void onTemperature_1_0_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc) {
   Real32_1_0<TEMP_PORT_ID> const d = Real32_1_0<TEMP_PORT_ID>::deserialize(transfer);
-  temperature_measurment = d;
+  tempAbove = d;
   temperature_last_received = millis();
 }
 
