@@ -70,6 +70,7 @@ static const gpio_num_t LOADCELL_DOUT_PIN = GPIO_NUM_17;
 static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
 
 static const gpio_num_t DHT_PIN = GPIO_NUM_15;
+static const gpio_num_t BLINKER_PIN = GPIO_NUM_32;
 
 const float calibration_factor = -68100;
 
@@ -77,7 +78,7 @@ static CanardPortID const LOADCELL_PORT_ID   = 1337U;
 static CanardPortID const DHT_T_PORT_ID   = 1338U;
 static CanardPortID const DHT_H_PORT_ID   = 1339U;
 
-static CanardPortID const TEMP_PORT_ID   = 2137U;
+static CanardPortID const ROCKET_STATE_PORT_ID = 2139U;
 
 #define COLUMS 20
 #define ROWS   4
@@ -94,6 +95,7 @@ bool transmitCanFrame(CanardFrame const &);
 void onReceiveCanFrame(CANMessage const &);
 void onGetInfo_1_0_Request_Received(CanardTransfer const &, ArduinoUAVCAN &);
 void onTemperature_1_0_Received(CanardTransfer const &, ArduinoUAVCAN &);
+void onBit_1_0_Received(CanardTransfer const &, ArduinoUAVCAN &);
 void get_scale();
 void get_dht();
 
@@ -138,6 +140,8 @@ void setup()
   //--- Switch on builtin led
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(BLINKER_PIN, OUTPUT);
+  digitalWrite(BLINKER_PIN, HIGH);
   //--- Start serial
   Serial.begin(115200);
   while (!Serial)
@@ -194,6 +198,8 @@ void setup()
 
   uc.subscribe<GetInfo_1_0::Request<>>(onGetInfo_1_0_Request_Received);
   uc.subscribe<Real32_1_0<TEMP_PORT_ID>>(onTemperature_1_0_Received);
+  uc.subscribe<Bit_1_0<ROCKET_STATE_PORT_ID>>(onBit_1_0_Received);
+  digitalWrite(BLINKER_PIN, LOW);
 }
 
 void loop()
@@ -339,6 +345,21 @@ void onTemperature_1_0_Received(CanardTransfer const & transfer, ArduinoUAVCAN &
   temperature_last_received = millis();
 }
 
+void onBit_1_0_Received(CanardTransfer const &transfer, ArduinoUAVCAN & /* uc */)
+{
+  Bit_1_0<ROCKET_STATE_PORT_ID> const blinkerLed = Bit_1_0<ROCKET_STATE_PORT_ID>::deserialize(transfer);
+
+  if (blinkerLed.data.value)
+  {
+    Serial.println("armed");
+    digitalWrite(BLINKER_PIN, HIGH);
+  }
+  else
+  {
+    Serial.print(",");
+    digitalWrite(BLINKER_PIN, LOW);
+  }
+}
 
 void print_ESP_chip_info()
 {
