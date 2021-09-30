@@ -11,7 +11,7 @@
 
 #include "Arduino.h"
 #include <SPI.h>
-#include <Wire.h>              //for ESP8266 use bug free i2c driver https://github.com/enjoyneering/ESP8266-I2C-Driver
+#include <Wire.h> //for ESP8266 use bug free i2c driver https://github.com/enjoyneering/ESP8266-I2C-Driver
 
 #include <core_version.h> // For ARDUINO_ESP32_RELEASE
 
@@ -51,13 +51,12 @@ static const uavcan_node_GetInfo_Response_1_0 GET_INFO_DATA = {
     /// saturated uint64 software_vcs_revision_id
     NULL,
     /// saturated uint8[16] unique_id
-    {0x86, 0xcc, 0xed, 0x61, 0x97, 0x1f, 0x4a, 0xf9, 
+    {0x86, 0xcc, 0xed, 0x61, 0x97, 0x1f, 0x4a, 0xf9,
      0x9d, 0x19, 0x51, 0xc3, 0x9a, 0xb9, 0xa8, 0xd1},
     /// saturated uint8[<=50] name
     {
         "pl.simle.r5.tensocan",
-        strlen("pl.simle.r5.tensocan")
-    },
+        strlen("pl.simle.r5.tensocan")},
 };
 
 static const uint32_t DESIRED_BIT_RATE = 125UL * 1000UL; // 125 kb/s
@@ -72,20 +71,21 @@ static const gpio_num_t LOADCELL_SCK_PIN = GPIO_NUM_16;
 static const gpio_num_t DHT_PIN = GPIO_NUM_15;
 static const gpio_num_t BLINKER_PIN = GPIO_NUM_32;
 
-const float calibration_factor = -68100;
+const float calibration_factor = -68100; // * -1 / 25 * 1.075;
 
-static CanardPortID const LOADCELL_PORT_ID   = 1337U;
-static CanardPortID const DHT_T_PORT_ID   = 1338U;
-static CanardPortID const DHT_H_PORT_ID   = 1339U;
+static CanardPortID const LOADCELL_PORT_ID = 1337U;
+static CanardPortID const DHT_T_PORT_ID = 1338U;
+static CanardPortID const DHT_H_PORT_ID = 1339U;
 
+static CanardPortID const TEMP_PORT_ID = 2137U;
 static CanardPortID const ROCKET_STATE_PORT_ID = 2139U;
 
 #define COLUMS 20
-#define ROWS   4
+#define ROWS 4
 
-#define PAGE   ((COLUMS) * (ROWS))
+#define PAGE ((COLUMS) * (ROWS))
 
-#define DHTTYPE    DHT11
+#define DHTTYPE DHT11
 
 /**************************************************************************************
  * FUNCTION DECLARATION
@@ -154,12 +154,14 @@ void setup()
   Serial.print("Error: ");
   Serial.print(error);
 
-  if (error == 0) {
+  if (error == 0)
+  {
     Serial.println(": LCD found.");
     show = 0;
     lcd.begin(16, 2); // initialize the lcd
-
-  } else {
+  }
+  else
+  {
     Serial.println(": LCD not found.");
   } // if
 
@@ -217,28 +219,31 @@ void loop()
     get_dht();
     uc.publish(hb);
     uc.publish(scale_measurment);
+    if (!dht_err)
+      uc.publish(dht_t_measurment);
     prev = now;
 
     lcd.clear();
     print_can_stats(lcd);
     print_weight(lcd, scale_measurment.data.value);
-    print_temp(lcd, tempAbove.data.value, 
-      now - temperature_last_received > 3000);
+    print_temp(lcd, tempAbove.data.value,
+               now - temperature_last_received > 3000);
     print_dht(lcd, dht_t_measurment.data.value, dht_h_measurment.data.value, dht_err);
 
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    Serial.print("Sent: ");
-    Serial.print(gSentFrameCount);
-    Serial.print("\t");
-    Serial.print("Receive: ");
-    Serial.print(gReceivedFrameCount);
-    Serial.print("\t");
-    Serial.print(" STATUS 0x");
-    Serial.print(CAN_STATUS, HEX);
-    Serial.print(" RXERR ");
-    Serial.print(CAN_RX_ECR);
-    Serial.print(" TXERR ");
-    Serial.println(CAN_TX_ECR);
+    // Serial.print("Sent: ");
+    // Serial.print(gSentFrameCount);
+    // Serial.print("\t");
+    // Serial.print("Receive: ");
+    // Serial.print(gReceivedFrameCount);
+    // Serial.print("\t");
+    // Serial.print(" STATUS 0x");
+    // Serial.print(CAN_STATUS, HEX);
+    // Serial.print(" RXERR ");
+    // Serial.print(CAN_RX_ECR);
+    // Serial.print(" TXERR ");
+    // Serial.println(CAN_TX_ECR);
+
   }
 
   CANMessage frame;
@@ -251,44 +256,51 @@ void loop()
     onReceiveCanFrame(frame);
     gReceivedFrameCount += 1;
   }
-
-
 }
 
 /**************************************************************************************
  * FUNCTION DEFINITION
  **************************************************************************************/
 
-void get_dht() {
+void get_dht()
+{
   sensors_event_t event;
   dht_err = false;
   dht.temperature().getEvent(&event);
-  if (isnan(event.temperature)) {
+  if (isnan(event.temperature))
+  {
     Serial.println(F("Error reading temperature!"));
     dht_err = true;
   }
-  else {
-    Serial.print(F("Temperature: "));
-    Serial.print(event.temperature);
-    Serial.println(F("°C"));
+  else
+  {
+    // Serial.print(F("Temperature: "));
+    // Serial.print(event.temperature);
+    // Serial.println(F("°C"));
     dht_t_measurment.data.value = event.temperature;
   }
   // Get humidity event and print its value.
   dht.humidity().getEvent(&event);
-  if (isnan(event.relative_humidity)) {
+  if (isnan(event.relative_humidity))
+  {
     Serial.println(F("Error reading humidity!"));
     dht_err = true;
   }
-  else {
-    Serial.print(F("Humidity: "));
-    Serial.print(event.relative_humidity);
-    Serial.println(F("%"));
+  else
+  {
+    // Serial.print(F("Humidity: "));
+    // Serial.print(event.relative_humidity);
+    // Serial.println(F("%"));
     dht_h_measurment.data.value = event.relative_humidity;
   }
 }
 
-void get_scale() {
+void get_scale()
+{
   scale_measurment.data.value = scale.get_units(10);
+  Serial.print(F("W: "));
+  Serial.print(scale_measurment.data.value, 4);
+  Serial.println(F("kg"));
 }
 
 bool transmitCanFrame(CanardFrame const &frame)
@@ -301,10 +313,10 @@ bool transmitCanFrame(CanardFrame const &frame)
   const void *p = frame.payload;
   for (size_t i = 0; i < frame.payload_size; i++)
   {
-    frame2.data[i] = *(uint8_t *) p;
+    frame2.data[i] = *(uint8_t *)p;
     p++;
   }
-  
+
   frame2.len = static_cast<uint8_t const>(frame.payload_size);
 
   // Serial.print("TX ");
@@ -319,19 +331,18 @@ bool transmitCanFrame(CanardFrame const &frame)
 
 void onReceiveCanFrame(CANMessage const &frame)
 {
-  CanardFrame const f
-    {
-      1,                        /* timestamp_usec  */
+  CanardFrame const f{
+      1,                                         /* timestamp_usec  */
       frame.id & MCP2515::CAN_ADR_BITMASK,       /* extended_can_id limited to 29 bit */
       static_cast<uint8_t const>(frame.len),     /* payload_size    */
       reinterpret_cast<const void *>(frame.data) /* payload         */
-    };
+  };
   Serial.print("RX ");
   Serial.println(frame.id);
   uc.onCanFrameReceived(f);
 }
 
-void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc)
+void onGetInfo_1_0_Request_Received(CanardTransfer const &transfer, ArduinoUAVCAN &uc)
 {
   GetInfo_1_0::Response<> rsp = GetInfo_1_0::Response<>();
   rsp.data = GET_INFO_DATA;
@@ -339,7 +350,8 @@ void onGetInfo_1_0_Request_Received(CanardTransfer const & transfer, ArduinoUAVC
   uc.respond(rsp, transfer.remote_node_id, transfer.transfer_id);
 }
 
-void onTemperature_1_0_Received(CanardTransfer const & transfer, ArduinoUAVCAN & uc) {
+void onTemperature_1_0_Received(CanardTransfer const &transfer, ArduinoUAVCAN &uc)
+{
   Real32_1_0<TEMP_PORT_ID> const d = Real32_1_0<TEMP_PORT_ID>::deserialize(transfer);
   tempAbove = d;
   temperature_last_received = millis();
